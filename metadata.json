@@ -1,0 +1,8 @@
+{
+  "name": "Polaris OS - 北极星认知操作系统",
+  "description": "A sophisticated cognitive operating system for strategic decision-making, power dynamics analysis, and long-term capability evolution.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
