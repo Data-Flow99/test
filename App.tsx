@@ -61,7 +61,6 @@ const App: React.FC = () => {
       const aistudio = (window as any).aistudio;
       if (aistudio) {
         const selected = await aistudio.hasSelectedApiKey();
-        // 检查多种可能的变量名
         const envKey = process.env.API_KEY || (process.env as any).GEMINI_API_KEY;
         setHasKey(selected || !isPlaceholderKey(envKey));
       } else {
@@ -76,11 +75,12 @@ const App: React.FC = () => {
     const aistudio = (window as any).aistudio;
     if (aistudio) {
       await aistudio.openSelectKey();
+      // 指南要求：假设选择成功并继续
       setHasKey(true);
       setDiagStatus('IDLE');
-      setDiagMsg('密钥已注入。请运行诊断以验证连通性。');
+      setDiagMsg('密钥配置重置。请重新运行诊断。');
     } else {
-      alert("当前环境不支持自动 Key 选择器。请确保在 Netlify 中正确配置了 API_KEY 或 GEMINI_API_KEY 环境变量。");
+      alert("当前环境不支持自动 Key 选择器。请在托管平台（如 Netlify）手动配置 API_KEY 环境变量。");
     }
   };
 
@@ -94,8 +94,12 @@ const App: React.FC = () => {
     } else {
       setDiagStatus('ERROR');
       setDiagMsg(result.message);
-      if ((result as any).isKeyInvalid) {
+      
+      // 如果触发了重置标志（404 或无效 KEY），自动弹出选择框
+      if ((result as any).shouldResetKey) {
         setHasKey(false);
+        // 延迟一秒方便用户看清错误信息
+        setTimeout(handleConnectKey, 1000);
       }
     }
   };
@@ -262,10 +266,10 @@ const App: React.FC = () => {
                     <div className="space-y-4 text-center md:text-left">
                        <h2 className="text-3xl font-black text-white tracking-tighter flex items-center gap-3">
                          <AlertTriangle className="text-red-500 w-8 h-8" />
-                         认知引擎 <span className="text-red-500">变量未对齐</span>
+                         认知引擎 <span className="text-red-500">协议受阻</span>
                        </h2>
                        <p className="text-slate-400 max-w-lg font-medium">
-                         系统未检测到有效的 API Key。请确保在 Netlify 环境变量中设置了 <code className="text-blue-400">API_KEY</code> 或 <code className="text-blue-400">GEMINI_API_KEY</code>。
+                         当前项目未获得模型访问授权（错误 404）。请使用下方按钮通过 AI Studio 连接一个开启了计费（Billing Enabled）的 Google Cloud 项目。
                        </p>
                     </div>
                     <button 
@@ -273,7 +277,7 @@ const App: React.FC = () => {
                       className="px-10 py-5 bg-blue-600 hover:bg-blue-500 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-2xl shadow-blue-900/40 flex items-center gap-3 active:scale-95"
                     >
                       <Key className="w-5 h-5" />
-                      重新授权协议
+                      重新关联付费项目
                     </button>
                   </div>
                 )}
@@ -293,7 +297,7 @@ const App: React.FC = () => {
                         
                         <div className="space-y-6 relative z-10">
                            <p className="text-sm text-slate-400 leading-relaxed max-w-md">
-                             Polaris 引擎支持多种环境变量命名方式。当前诊断将扫描所有的认知链路。
+                             404 错误通常意味着模型对当前 API Key 不可用。Polaris 将尝试重新对齐协议。
                            </p>
                            
                            {diagStatus !== 'IDLE' && (
@@ -316,15 +320,13 @@ const App: React.FC = () => {
                                {diagStatus === 'LOADING' ? '分析中...' : '开始全局诊断'}
                              </button>
                              
-                             {!hasKey && (
-                               <button 
-                                 onClick={handleConnectKey}
-                                 className="px-8 py-3 bg-red-600 hover:bg-red-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-red-900/30 flex items-center gap-2"
-                               >
-                                 <Key className="w-4 h-4" />
-                                 同步云端变量
-                               </button>
-                             )}
+                             <button 
+                               onClick={handleConnectKey}
+                               className="px-8 py-3 bg-slate-800 hover:bg-slate-700 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                             >
+                               <Key className="w-4 h-4" />
+                               强制重置 Key 缓存
+                             </button>
                            </div>
                         </div>
                         <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">

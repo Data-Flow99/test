@@ -3,10 +3,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { RiskLevel } from "./types";
 
 const getAIInstance = () => {
-  // 兼容性逻辑：优先使用标准 API_KEY，回退到用户发现的 GEMINI_API_KEY
+  // 实时从环境变量读取，以支持 openSelectKey 注入后的动态更新
   let apiKey = (process.env.API_KEY || (process.env as any).GEMINI_API_KEY)?.trim();
   
-  // 识别并过滤常见的占位符字符串
+  // 识别并过滤无效占位符
   if (!apiKey || 
       apiKey === 'undefined' || 
       apiKey === 'PLACEHOLDER_API_KEY' || 
@@ -19,14 +19,14 @@ const getAIInstance = () => {
 };
 
 /**
- * 诊断工具：检查 API 密钥是否有效且能正常响应。
+ * 诊断工具：检查 API 密钥是否有效。
  */
 export const testApiKeyConnectivity = async () => {
   try {
     const ai = getAIInstance();
-    // 使用轻量级模型进行连通性测试
+    // 使用规范定义的 Flash Lite 模型进行探测
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-lite-latest',
+      model: 'gemini-flash-lite-latest',
       contents: "Diagnostic Ping. Reply with 'OK'.",
     });
     return { success: true, message: response.text || "Connection established." };
@@ -34,21 +34,22 @@ export const testApiKeyConnectivity = async () => {
     console.error("Diagnostic Error:", error);
     
     let userFriendlyMsg = error.message || "Unknown connectivity error";
-    let isKeyInvalid = false;
+    let shouldResetKey = false;
 
-    // 捕获典型的密钥错误信息
-    if (userFriendlyMsg.includes("API key not valid") || 
-        userFriendlyMsg.includes("INVALID_ARGUMENT") || 
-        userFriendlyMsg.includes("not found") ||
-        error.status === 400) {
-      userFriendlyMsg = "API Key 校验失败：当前环境变量 (API_KEY/GEMINI_API_KEY) 无效。请检查部署平台设置或通过 UI 重新连接。";
-      isKeyInvalid = true;
+    // 捕获 Requested entity was not found (404)
+    if (userFriendlyMsg.includes("Requested entity was not found") || error.status === 404) {
+      userFriendlyMsg = "错误 404: 找不到请求的模型或 API Key 权限不足。请确保选择了开启计费的 Paid Project 并重新授权。";
+      shouldResetKey = true;
+    } 
+    else if (userFriendlyMsg.includes("API key not valid") || error.status === 400) {
+      userFriendlyMsg = "API Key 无效。请检查部署平台的环境变量或重新连接。";
+      shouldResetKey = true;
     }
 
     return { 
       success: false, 
       message: userFriendlyMsg,
-      isKeyInvalid: isKeyInvalid,
+      shouldResetKey: shouldResetKey,
       status: error.status || "FAILED"
     };
   }
